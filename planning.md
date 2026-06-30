@@ -103,9 +103,11 @@ These cases are part of the reason the system uses hedged labels and an appeal p
 
 **6. Architecture Summary**
 
-The basic submission flow is straightforward. A user sends `POST /submit` with text and `creator_id`. The Flask route sends the text through the Groq-based LLM signal and the stylometric signal in parallel, combines the scores, turns the result into one of the three labels, writes the full record to the audit log, and returns the JSON response.
+The basic submission flow is straightforward. A user sends `POST /submit` with text and `creator_id`. The Flask route sends <img width="461" height="1007" alt="AI201(4 1) drawio" src="https://github.com/user-attachments/assets/228a38d8-da85-4453-8120-cdef32686c00" />
 
 The appeal flow is just as direct. A user sends `POST /appeal` with a `content_id` and a reason. The app looks up the original record, switches the status to `under_review`, adds an appeal-specific audit log entry, and confirms receipt. No automatic reclassification happens.
+<img width="320" height="730" alt="AI201(4 2) drawio" src="https://github.com/user-attachments/assets/76a30256-44ae-4c16-b919-7e5b6fac299b" />
+
 
 **7. AI Tool Plan**
 
