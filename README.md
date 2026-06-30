@@ -39,39 +39,7 @@ curl -X POST http://localhost:5000/submit ^
 
 **1. Architecture overview — the path a submission takes**
 
-```
-POST /submit  { text, creator_id }
-        │
-        ▼
-   input validation ───► 400 if text/creator_id missing or empty
-        │
-        ▼
-  ┌─────────────────────────────────────────────────────────┐
-  │  THREE DETECTION SIGNALS  (signals.py)                    │
-  │                                                           │
-  │  Signal 1  get_llm_score()          → llm_score      [0,1]│  (Groq, network call)
-  │  Signal 2  get_stylometric_score()  → stylo_score    [0,1]│  (pure Python)
-  │  Signal 3  get_linguistic_patterns()→ ling_score     [0,1]│  (pure Python, stretch)
-  └─────────────────────────────────────────────────────────┘
-        │
-        ▼
-   combine_signals()  →  confidence  (ensemble mean, [0,1] = P(AI))
-        │
-        ▼
-   attribution_from_score()   →  "likely_human" | "uncertain" | "likely_ai"
-   get_transparency_label()   →  one of three exact human-readable strings
-        │
-        ▼
-  ┌─────────────────────────────────────────────────────────┐
-  │  PERSISTENCE  (store.py, SQLite)                          │
-  │   content     — canonical, MUTABLE record (status flips   │
-  │                 classified → under_review on appeal)      │
-  │   audit_log   — APPEND-ONLY snapshot of every decision    │
-  └─────────────────────────────────────────────────────────┘
-        │
-        ▼
-   JSON response  { content_id, attribution, confidence, label, signals, status }
-```
+<img width="461" height="1007" alt="AI201(4 1) drawio" src="https://github.com/user-attachments/assets/228a38d8-da85-4453-8120-cdef32686c00" />
 
 If Signal 1's network call fails the request returns `502` with an honest error rather than silently degrading to the heuristic signals — a partial classifier shouldn't masquerade as a full one.
 
