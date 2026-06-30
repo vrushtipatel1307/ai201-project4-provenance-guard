@@ -1,6 +1,6 @@
 Provenance Guard — Planning
 
-## 1. Detection Signals
+**1. Detection Signals**
 
 The system uses two signals, so it is not relying on only one way of judging the text.
 
@@ -42,7 +42,7 @@ The LLM score got more weight because it captures meaning and context, while the
  documented two-signal fallback. See README §7 (Spec reflection) for the full
  rationale.
 
-## 2. Uncertainty Representation
+**2. Uncertainty Representation**
 
 The `combined_score` represents the estimated probability that the text was AI-generated.
 
@@ -64,7 +64,7 @@ This is not statistical calibration in the strict sense. Instead, it is behavior
 
 Full breakdowns are in README §3 (Confidence scoring).
 
-## 3. Transparency Label Design
+**3. Transparency Label Design**
 
 These are the exact labels the API should return:
 
@@ -74,7 +74,7 @@ These are the exact labels the API should return:
 
 The wording stays cautious on purpose. The system should never present its output like an absolute fact, and the AI label should avoid sounding accusatory. Every response should also make it clear that an appeal is possible.
 
-## 4. Appeals Workflow
+**4. Appeals Workflow**
 
 The appeal flow is designed to let the original creator challenge a classification without building a full authentication system.
 
@@ -89,9 +89,9 @@ When an appeal is received:
 
 For the reviewer’s side, `GET /log` filtered to `status: "under_review"` would show the original text, both signal scores, the combined score, the label that was shown, and the creator’s reasoning. That gives enough context for a manual decision without running detection again.
 
-Automated re-classification is out of scope.
+Automated reclassification is out of scope.
 
-## 5. Anticipated Edge Cases
+**5. Anticipated Edge Cases**
 
 There are a few situations where the system may struggle:
 
@@ -101,13 +101,13 @@ There are a few situations where the system may struggle:
 
 These cases are part of the reason the system uses hedged labels and an appeal path instead of pretending it can always be certain.
 
-## 6. Architecture Summary
+**6. Architecture Summary**
 
 The basic submission flow is straightforward. A user sends `POST /submit` with text and `creator_id`. The Flask route sends the text through the Groq-based LLM signal and the stylometric signal in parallel, combines the scores, turns the result into one of the three labels, writes the full record to the audit log, and returns the JSON response.
 
-The appeal flow is just as direct. A user sends `POST /appeal` with a `content_id` and a reason. The app looks up the original record, switches the status to `under_review`, adds an appeal-specific audit log entry, and confirms receipt. No automatic re-classification happens.
+The appeal flow is just as direct. A user sends `POST /appeal` with a `content_id` and a reason. The app looks up the original record, switches the status to `under_review`, adds an appeal-specific audit log entry, and confirms receipt. No automatic reclassification happens.
 
-## 7. AI Tool Plan
+**7. AI Tool Plan**
 
 **M3: submission endpoint and first signal**
 
@@ -129,10 +129,9 @@ The appeal flow is just as direct. A user sends `POST /appeal` with a `content_i
 
 ---
 
-## 8. Stretch Features (Extra Credit)
+**8. Stretch Features (Extra Credit)**
 
-### Stretch Feature 1: Ensemble Detection (3+ Signals)
-
+**Stretch Feature 1: Ensemble Detection (3+ Signals)**
 **Status: IMPLEMENTED**
 
 Added Signal 3: Linguistic Patterns Detection measuring:
@@ -154,8 +153,7 @@ Each signal votes with equal weight. This makes the system more robust:
 - High-hedging AI text: Signals (0.8, 0.633, 1.0) → Combined: 0.811 
 - Mixed-confidence text: Signals (0.4, 0.483, 0.5) → Combined: 0.461 (uncertain) 
 
-### Stretch Feature 2: Provenance Certificate (Verified Human Credential)
-
+**Stretch Feature 2: Provenance Certificate (Verified Human Credential)**
 **Status: IMPLEMENTED**
 
 Creators can earn a "Verified Human" badge through an optional verification process.
@@ -192,9 +190,9 @@ Response:
 
 ---
 
-## 9. Complete Feature Checklist
+**9. Complete Feature Checklist**
 
-### Required Features (7/7)
+**Required Features (7/7)**
 - [x] Content submission endpoint
 - [x] Multi-signal detection (2+ signals)
 - [x] Confidence scoring with uncertainty
@@ -203,7 +201,7 @@ Response:
 - [x] Rate limiting
 - [x] Audit log
 
-### Stretch Features (2/4) 
+**Stretch Features (2/4)**
 - [x] Ensemble detection (3+ signals)
 - [x] Provenance certificate
 - [x] Analytics dashboard
@@ -211,7 +209,7 @@ Response:
 
 ---
 
-## 10. Known Limitations & Edge Cases
+**10. Known Limitations & Edge Cases**
 
 **Handled by current design:**
 1. Short/repetitive text — stylometric signal struggles; LLM and linguistic signals provide backup
