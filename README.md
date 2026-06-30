@@ -201,13 +201,12 @@ Each `/submit` response also returns `attribution`, `confidence`, and the full p
 
 ---
 
-## 5. Rate limiting
+**5. Rate limiting**
 
 Applied to `/submit` (the only expensive, abusable endpoint — it makes a paid LLM call per request) via `flask-limiter`, keyed on client IP:
 
-```
 10 per minute;100 per day
-```
+
 
 **Reasoning for these specific values:**
 
@@ -219,7 +218,7 @@ Exceeding either limit returns HTTP **429 Too Many Requests**. Read endpoints (`
 
 ---
 
-## 6. Known limitations
+**6. Known limitations**
 
 **The system will reliably misclassify formal, structured *human* writing — academic abstracts, legal/policy prose, technical documentation, and especially competent non-native-English writing — as AI.** Example B above is a live instance: a real human sentence that the LLM signal rated 0.80 AI.
 
@@ -234,7 +233,7 @@ Secondary limitations: heuristics are unreliable below ~3 sentences (return neut
 
 ---
 
-## 7. Spec reflection
+**7. Spec reflection**
 
 **How the spec (planning.md) helped.** Writing the transparency-label wording and the threshold table *before* coding was the highest-leverage thing I did. Because the three exact label strings and the 0.40 / 0.70 cutoffs were fixed in the plan, `signals.py` had a single source of truth — `get_transparency_label()` and `attribution_from_score()` share the same `HUMAN_CEILING`/`AI_FLOOR` constants — and I never had thresholds drifting between the labeling code and the response code. The plan's "asymmetric cost → wide uncertain band" rationale also kept me from caving to the temptation to tighten the band for cleaner-looking demos.
 
@@ -242,7 +241,7 @@ Secondary limitations: heuristics are unreliable below ~3 sentences (return neut
 
 ---
 
-## 8. AI usage
+**8. AI usage**
 
 I used an AI coding assistant throughout, directing it against the plan and verifying every output. Specific instances:
 
@@ -254,17 +253,17 @@ I used an AI coding assistant throughout, directing it against the plan and veri
 
 ---
 
-## 9. Stretch features (extra credit)
+**9. Stretch features (extra credit)**
 
-- **Ensemble detection (3+ signals)** — Signal 3 + equal-weight ensemble, described above. ✅
-- **Provenance certificate** — `POST /verify` awards creators a "Verified Human" badge, stored in `creator_verification`; every submission response and audit entry carries the `creator_verified` flag. Asymmetric-risk tool: a verified human has a stronger footing on appeal. ✅
-- **Analytics dashboard** — `/dashboard` (HTML + Chart.js) and `/api/analytics` (JSON): confidence-band distribution, per-signal mean/min/max, signal-agreement %, verification rate. ✅ (with the known `linguistic_score` persistence bug, §6)
+- **Ensemble detection (3+ signals)** — Signal 3 + equal-weight ensemble, described above. 
+- **Provenance certificate** — `POST /verify` awards creators a "Verified Human" badge, stored in `creator_verification`; every submission response and audit entry carries the `creator_verified` flag. Asymmetric-risk tool: a verified human has a stronger footing on appeal. 
+- **Analytics dashboard** — `/dashboard` (HTML + Chart.js) and `/api/analytics` (JSON): confidence-band distribution, per-signal mean/min/max, signal-agreement %, verification rate. (with the known `linguistic_score` persistence bug, §6)
 
 ---
 
-## 10. Evidence
+**10. Evidence**
 
-### Audit-log sample (real entry, `GET /log`)
+**Audit-log sample (real entry, `GET /log`)**
 ```json
 {
   "content_id": "2ead8a15-3239-4f7c-bf4d-ca276bef33f2",
@@ -283,16 +282,17 @@ I used an AI coding assistant throughout, directing it against the plan and veri
   "status": "classified"
 }
 ```
+
 Every decision stores a complete, self-contained snapshot — a reviewer never has to re-run detection.
 
-### Rate-limit behavior
+**Rate-limit behavior**
 The 11th `/submit` within one minute (or 101st in a day) returns:
 ```
 HTTP/1.1 429 TOO MANY REQUESTS
 { "error": "429 Too Many Requests: 10 per 1 minute" }
 ```
 
-### Appeal handling (`POST /appeal`)
+**Appeal handling (`POST /appeal`)**
 Request:
 ```json
 { "content_id": "2ead8a15-3239-4f7c-bf4d-ca276bef33f2",
@@ -304,14 +304,7 @@ Response:
   "status": "under_review",
   "message": "Appeal received. A human reviewer will examine your submission." }
 ```
-The content row flips `classified → under_review`; a new append-only `appeal` audit entry is written carrying the creator's reasoning plus the original attribution, confidence, and every signal score — enough context for a manual reviewer to decide without re-running detection. Automated re-classification is intentionally out of scope.
+The content row flips `classified → under_review`; a new append-only `appeal` audit entry is written carrying the creator's reasoning plus the original attribution, confidence, and every signal score — enough context for a manual reviewer to decide without re-running detection. Automated reclassification is intentionally out of scope.
 
----
-
-## 11. Portfolio walkthrough
-
-A short (~2 min) screen recording walking through a live `/submit` → label, the audit log, a rate-limit trip, and the appeal flow, with a few words on the asymmetric-cost design.
-
-> **Link:** _[add your recording link here]_
 
 (The detailed evidence — audit-log sample, rate-limit behavior, label variants, appeal handling — lives in §4, §5, and §10 above; the recording is just a quick narrated tour.)
