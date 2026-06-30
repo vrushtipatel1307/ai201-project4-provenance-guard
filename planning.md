@@ -2,7 +2,7 @@ Provenance Guard — Planning
 
 ## 1. Detection Signals
 
-The system uses two signals so it is not relying on only one way of judging the text.
+The system uses two signals, so it is not relying on only one way of judging the text.
 
 **Signal 1 — LLM-based classification (Groq, llama-3.3-70b-versatile)**
 
@@ -32,15 +32,15 @@ The original (two-signal) plan calculated the final score as:
 
 The LLM score got more weight because it captures meaning and context, while the stylometric score acts as a secondary check. If the two disagree a lot, the final score should stay closer to the middle, because disagreement means uncertainty.
 
-> **Update (post-implementation, before stretch features):** Once Signal 3
-> (linguistic patterns) was added, the default combiner changed to an
-> **equal-weight three-signal ensemble**:
-> `confidence = (llm_score + stylometric_score + linguistic_score) / 3`.
-> Equal voting is the more defensible combiner for three independent signals
-> and gives the self-correcting "disagreement → uncertainty" behavior. The
-> original `0.6 / 0.4` weighting is retained in `combine_signals()` as a
-> documented two-signal fallback. See README §7 (Spec reflection) for the full
-> rationale.
+ **Update (post-implementation, before stretch features):** Once Signal 3
+ (linguistic patterns) was added, the default combiner changed to an
+ **equal-weight three-signal ensemble**:
+ `confidence = (llm_score + stylometric_score + linguistic_score) / 3`.
+ Equal voting is the more defensible combiner for three independent signals
+ and gives the self-correcting "disagreement → uncertainty" behavior. The
+ original `0.6 / 0.4` weighting is retained in `combine_signals()` as a
+ documented two-signal fallback. See README §7 (Spec reflection) for the full
+ rationale.
 
 ## 2. Uncertainty Representation
 
@@ -56,13 +56,13 @@ A score like 0.6 should not be treated as a hard verdict. It should produce hedg
 
 This is not statistical calibration in the strict sense. Instead, it is behavioral calibration: we test sample inputs, compare the ordering with human intuition, and adjust the weights and thresholds until the results make sense.
 
-> **Update (validated scores):** Testing confirmed the score spreads across all
-> three bands rather than clustering. Representative results:
-> - Casual human text → confidence **0.167** (`likely_human`, high confidence)
-> - Short formal sentence → confidence **0.594** (`uncertain`, low confidence)
-> - High-hedging AI text → confidence **0.811** (`likely_ai`, high confidence)
->
-> Full breakdowns are in README §3 (Confidence scoring).
+ **Update (validated scores):** Testing confirmed the score spreads across all
+ Three bands rather than clustering. Representative results:
+ - Casual human text → confidence **0.167** (`likely_human`, high confidence)
+ - Short formal sentence → confidence **0.594** (`uncertain`, low confidence)
+ - High-hedging AI text → confidence **0.811** (`likely_ai`, high confidence)
+
+Full breakdowns are in README §3 (Confidence scoring).
 
 ## 3. Transparency Label Design
 
@@ -125,7 +125,7 @@ The appeal flow is just as direct. A user sends `POST /appeal` with a `content_i
 
 - What I'll provide: label variants + appeals workflow + architecture diagram
 - What I'll ask for: label generation + /appeal endpoint
-- How I'll verify: all 3 label variants reachable, appeal updates status, rate limiting triggers 429
+- How I'll verify: all 3 label variants are reachable, appeal updates status, rate limiting triggers 429
 
 ---
 
@@ -161,20 +161,16 @@ Each signal votes with equal weight. This makes the system more robust:
 Creators can earn a "Verified Human" badge through an optional verification process.
 
 **New Endpoint: POST /verify**
-```json
 {
   "creator_id": "creator-123",
   "verification_method": "email"
 }
-```
 
 Response:
-```json
 {
   "verified": true,
   "certificate_text": "✓ Verified Creator has been verified as a genuine human author..."
 }
-```
 
 **How It Works:**
 1. Creator completes verification (email, ID check, etc.)
@@ -220,7 +216,7 @@ Response:
 **Handled by current design:**
 1. Short/repetitive text — stylometric signal struggles; LLM and linguistic signals provide backup
 2. Formal human writing — LLM may flag as AI; stylometric and linguistic signals detect human patterns
-3. Lightly edited AI — uncertain band (0.40-0.69) gives honest "don't know" answer rather than false confidence
+3. Lightly edited AI — uncertain band (0.40-0.69) gives an honest "don't know" answer rather than false confidence
 
 **The dominant failure mode (honest):** formal, structured *human* writing —
 academic, legal, technical, and non-native-English prose — is reliably
