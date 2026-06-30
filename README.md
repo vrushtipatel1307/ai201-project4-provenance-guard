@@ -12,7 +12,7 @@ python -m venv .venv
 .venv\Scripts\activate            # Windows
 pip install -r requirements.txt
 
-# Signal 1 calls Groq, so a key is required:
+**Signal 1 calls Groq, so a key is required:**
 echo GROQ_API_KEY=your_key_here > .env
 
 python app.py                     # serves on http://localhost:5000
