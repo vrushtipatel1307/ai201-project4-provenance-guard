@@ -6,9 +6,8 @@ The core design stance: **this is a probabilistic judgment, not a verdict.** A f
 
 ---
 
-## Quick start
+**Quick start**
 
-```bash
 python -m venv .venv
 .venv\Scripts\activate            # Windows
 pip install -r requirements.txt
@@ -17,15 +16,14 @@ pip install -r requirements.txt
 echo GROQ_API_KEY=your_key_here > .env
 
 python app.py                     # serves on http://localhost:5000
-```
+
 
 Submit something:
 
-```bash
 curl -X POST http://localhost:5000/submit ^
   -H "Content-Type: application/json" ^
   -d "{\"text\": \"Hey, I'm really happy about this! It's so cool, don't you think?\", \"creator_id\": \"casual-user\"}"
-```
+
 
 | Endpoint | Method | Purpose |
 |---|---|---|
@@ -39,7 +37,7 @@ curl -X POST http://localhost:5000/submit ^
 
 ---
 
-## 1. Architecture overview — the path a submission takes
+**1. Architecture overview — the path a submission takes**
 
 ```
 POST /submit  { text, creator_id }
@@ -83,26 +81,26 @@ The audit log is deliberately separate from the content table: an appeal can cha
 
 ---
 
-## 2. Detection signals — what each measures, why I chose it, what it misses
+**2. Detection signals — what each measures, why I chose it, what it misses**
 
-I use three signals on the principle that no single lens is trustworthy on its own. They're chosen to be **independent**: they fail in different ways, so when they agree I can trust the result more, and when they disagree the score drifts toward the uncertain band on its own.
+I use three signals on the principle that no single lens is trustworthy on its own. They're chosen to be **independent**: they fail in different ways, so when they agree, I can trust the result more, and when they disagree, the score drifts toward the uncertain band on its own.
 
-### Signal 1 — LLM classification (Groq, `llama-3.3-70b-versatile`)
+**Signal 1 — LLM classification (Groq, `llama-3.3-70b-versatile`)**
 
 - **Measures:** Holistic, *semantic* AI-ness. The model is prompted as a forensic analyst and returns `{ai_probability, verdict, reasoning}`. `ai_probability` becomes `llm_score`. Temperature is 0 for the most deterministic output a classifier can get.
 - **Why I chose it:** It's the only signal that reads *meaning*. It catches the things heuristics can't articulate — generic phrasing, "lived-in" specificity vs. boilerplate, the particular even cadence of model output. It's the strongest single signal, which is why it had the heaviest weight in the original two-signal design.
 - **What it misses:** It's pattern-matching, not ground truth. It can be fooled by lightly-edited AI text, and — the dangerous failure — it can flag careful, formal, or non-native-English human writing as AI because that prose *resembles* model output. It's also non-deterministic across model updates and adds network latency and a hard dependency on an external API.
 
-### Signal 2 — Stylometric heuristics (pure Python)
+**Signal 2 — Stylometric heuristics (pure Python)**
 
 - **Measures:** *Structure*, not meaning. Average of three normalized metrics:
   - **Sentence-length variance** (coefficient of variation) — AI tends to produce uniform sentence lengths; humans are bursty.
   - **Type-token ratio** — vocabulary diversity; AI often repeats a narrower vocabulary.
   - **Punctuation density and variety** — humans use punctuation more irregularly.
 - **Why I chose it:** It's transparent, deterministic, free, and completely independent of the LLM — it can't be fooled by the same things the LLM is fooled by. It's a structural cross-check.
-- **What it misses:** It's statistically meaningless on short text — with one or two sentences there isn't enough data for variance or TTR to mean anything, so it returns a neutral 0.5. It also has no concept of meaning, so polished human prose with even sentences scores AI-like.
+- **What it misses:** It's statistically meaningless on short text with one or two sentences; there isn't enough data for variance or TTR to mean anything, so it returns a neutral 0.5. It also has no concept of meaning, so polished human prose with even sentences scores AI-like.
 
-### Signal 3 — Linguistic patterns (pure Python, stretch / ensemble)
+**Signal 3 — Linguistic patterns (pure Python, stretch/ensemble)**
 
 - **Measures:** Surface lexical tells. Density of hedging/formal connectors ("however," "moreover," "furthermore," "it is important to note") and *absence* of contractions (AI under-uses contractions; humans use them freely).
 - **Why I chose it:** It targets a very specific, recognizable AI register that the stylometric signal doesn't capture and that the LLM signal sometimes under-weights. Cheap to compute and easy to explain.
@@ -112,15 +110,13 @@ I use three signals on the principle that no single lens is trustworthy on its o
 
 ---
 
-## 3. Confidence scoring
+**3. Confidence scoring**
 
-### How signals are combined
+**How signals are combined**
 
-```python
 confidence = (llm_score + stylometric_score + linguistic_score) / 3   # ensemble mean
-```
 
-A simple equal-weight average of all three signals, producing `confidence` ∈ [0, 1] = estimated probability the text is AI-generated. Each signal gets one vote.
+A simple equal-weight average of all three signals, producing `confidence` ∈ [0, 1] = the estimated probability that the text is AI-generated. Each signal gets one vote.
 
 `confidence` maps to an attribution and a label through fixed thresholds (`signals.py`):
 
@@ -130,17 +126,17 @@ A simple equal-weight average of all three signals, producing `confidence` ∈ [
 | `0.40 – 0.69` | `uncertain` | **Low — system says "I don't know"** |
 | `0.70 – 1.00` | `likely_ai` | High |
 
-**Why this approach.** I started with a weighted scheme (`0.6·llm + 0.4·stylometric`) that trusted the LLM most, and kept that as a documented two-signal fallback in `combine_signals()`. But once Signal 3 made it a three-signal system, equal weighting became the more defensible default: averaging independent signals is exactly what pulls a confident-but-wrong single signal back toward the middle when the others disagree. That self-correction is the whole point. A lone LLM saying 0.9 while two heuristics say 0.4 lands at ~0.57 — *uncertain* — which is the honest answer when signals conflict.
+**Why this approach?** I started with a weighted scheme (`0.6·llm + 0.4·stylometric`) that trusted the LLM most, and kept that as a documented two-signal fallback in `combine_signals()`. But once Signal 3 made it a three-signal system, equal weighting became the more defensible default: averaging independent signals is exactly what pulls a confident-but-wrong single signal back toward the middle when the others disagree. That self-correction is the whole point. A lone LLM saying 0.9 while two heuristics say 0.4 lands at ~0.57 — *uncertain* — which is the honest answer when signals conflict.
 
-**Why the uncertain band is wide (0.40–0.69, ~30% of the range).** This is asymmetric-cost design. Falsely accusing a human of using AI is far more damaging than declining to judge, so I made "I don't know" easy to reach. The threshold for `likely_ai` (0.70) is deliberately higher than the symmetric 0.5 would be.
+**Why is the uncertain band wide (0.40–0.69, ~30% of the range).** This is asymmetric-cost design. Falsely accusing a human of using AI is far more damaging than declining to judge, so I made "I don't know" easy to reach. The threshold for `likely_ai` (0.70) is deliberately higher than the symmetric 0.5 would be.
 
-### Validation — does the score produce meaningful variation?
+**Validation — does the score produce meaningful variation?**
 
 This is behavioral, not statistical, calibration: I ran a range of inputs and confirmed the score *orders* them the way a human would and *spreads* them across all three bands rather than clustering. The scores below are real records from the project's SQLite store (`provenance.db`) and the Milestone-4 ensemble tests.
 
-#### Example A — High-confidence case (clearly human)
+**Example A — High-confidence case (clearly human)**
 
-> *"Hey, I'm really happy about this! It's so cool, don't you think?"* — `creator_id: casual-user`
+*"Hey, I'm really happy about this! It's so cool, don't you think?"* — `creator_id: casual-user`
 
 | Signal | Score |
 |---|---|
@@ -151,9 +147,9 @@ This is behavioral, not statistical, calibration: I ran a range of inputs and co
 
 Contractions, exclamation, irregular rhythm, casual voice — the heuristics drive this firmly into the human band. The system is *confident*.
 
-#### Example B — Lower-confidence case (genuinely ambiguous)
+**Example B — Lower-confidence case (genuinely ambiguous)**
 
-> *"The implementation demonstrates various analytical capabilities."* — `creator_id: technical-user`
+ *"The implementation demonstrates various analytical capabilities."* — `creator_id: technical-user`
 
 | Signal | Score |
 |---|---|
@@ -165,13 +161,13 @@ Contractions, exclamation, irregular rhythm, casual voice — the heuristics dri
 
 The LLM is fairly sure it's AI, but it's a single short, formal sentence — too little signal for the heuristics, which sit near neutral. The disagreement is exactly what *should* produce hedging, and the ensemble lands at 0.594 → **uncertain**. The system declines to accuse.
 
-**The gap between A and B is 0.167 vs 0.594 — a 0.43 spread across two different label variants**, demonstrating the score is not a constant.
+**The gap between A and B is 0.167 vs 0.594 — a 0.43 spread across two different label variants**, demonstrating the score is not constant.
 
-#### Example C — High-confidence AI (Milestone-4 ensemble test)
+**Example C — High-confidence AI (Milestone-4 ensemble test)**
 
 High-hedging, connector-heavy AI text scored `(LLM 0.8, stylometric 0.633, linguistic 1.0) → confidence 0.811 → likely_ai`, confirming the top band is reachable. Together, A/B/C land in all three bands.
 
-### What I'd change deploying this for real
+**What I'd change deploying this for real**
 
 - **Calibrate against a labeled corpus.** "Behavioral calibration" is fine for a class project; production needs real human/AI-labeled data so the 0.70 threshold reflects a measured false-positive rate, not intuition.
 - **Length-aware weighting.** The heuristics are noise below ~3 sentences. I'd down-weight or drop them on short text instead of letting their neutral 0.5 dilute a confident LLM read (which is what muddies Example B).
@@ -179,29 +175,26 @@ High-hedging, connector-heavy AI text scored `(LLM 0.8, stylometric 0.633, lingu
 
 ---
 
-## 4. Transparency label — the three variants
+**4. Transparency label — the three variants**
 
 The label is plain prose, never a bare verdict, and is intentionally hedged. Below is the **exact text** each variant displays (from `get_transparency_label()` in `signals.py`).
 
-### Variant 1 — High-confidence AI (`confidence ≥ 0.70`)
-```
-This content shows strong indicators of AI generation. Our system is fairly
-confident this was created or substantially produced by an AI tool.
-```
-Even at high confidence it says "fairly confident" and "indicators," never "this is AI." It avoids sounding accusatory.
+**Variant 1 — High-confidence AI (`confidence ≥ 0.70`)**
 
-### Variant 2 — Uncertain (`0.40 ≤ confidence < 0.70`)
-```
-We can't confidently determine whether this content was written by a human or
-generated by AI. Treat this result as inconclusive.
-```
-A genuine non-answer. No number is foregrounded, no implication of either outcome.
+This content shows strong indicators of AI generation. Our system is fairly confident this was created or substantially produced by an AI tool.
 
-### Variant 3 — High-confidence human (`confidence < 0.40`)
-```
-This content shows strong indicators of human authorship. Our system did not
-detect significant signs of AI generation.
-```
+Even at high confidence, it says "fairly confident" and "indicators," never "this is AI." It avoids sounding accusatory.
+
+**Variant 2 — Uncertain (`0.40 ≤ confidence < 0.70`)**
+
+We can't confidently determine whether this content was written by a human or generated by AI. Treat this result as inconclusive.
+
+A genuine non-answer. No number is foregrounded; no implication of either outcome.
+
+**Variant 3 — High-confidence human (`confidence < 0.40`)**
+
+This content shows strong indicators of human authorship. Our system did not detect significant signs of AI generation.
+
 Phrased as "did not detect signs of AI" rather than "this is human" — an absence of evidence, not proof.
 
 Each `/submit` response also returns `attribution`, `confidence`, and the full per-signal breakdown alongside the label, and every label shown is captured verbatim in the audit log.
